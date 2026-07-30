@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 declare_id!("4XeRRycAsykrjrYYVwZLqtC4FCurZzwxnwPU2qonv3Ui");
 
 #[program]
-pub mod day2_vault {
+pub mod vault {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

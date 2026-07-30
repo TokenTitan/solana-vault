@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-day2_vault = "4XeRRycAsykrjrYYVwZLqtC4FCurZzwxnwPU2qonv3Ui"
+vault = "4XeRRycAsykrjrYYVwZLqtC4FCurZzwxnwPU2qonv3Ui"
 
 [registry]
 url = "https://api.apr.dev"
