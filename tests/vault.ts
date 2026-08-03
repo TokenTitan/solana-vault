@@ -10,7 +10,7 @@ describe("vault", () => {
 
   it("Is initialized!", async () => {
     // Add your test here.
-    const tx = await program.methods.initialize().rpc();
+    const tx = await program.methods.initializeVault().rpc();
     console.log("Your transaction signature", tx);
   });
 });
