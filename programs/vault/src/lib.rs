@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+    close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TokenInterface,
+    TransferChecked,
 };
 
 declare_id!("4XeRRycAsykrjrYYVwZLqtC4FCurZzwxnwPU2qonv3Ui");
@@ -18,7 +19,7 @@ pub mod vault {
         vault_state.bump = ctx.bumps.vault_state;
         vault_state.vault_bump = ctx.bumps.vault_token_account;
 
-        msg!("Greetings from: {:?}", ctx.program_id);
+        msg!("Vault initialized for mint: {}", ctx.accounts.mint.key());
         Ok(())
     }
 
@@ -78,6 +79,37 @@ pub mod vault {
             .deposited
             .checked_sub(amount)
             .ok_or(VaultError::MathOverflow)?;
+
+        Ok(())
+    }
+
+    pub fn close_vault(ctx: Context<CloseVault>) -> Result<()> {
+        require!(
+            ctx.accounts.vault_state.deposited == 0,
+            VaultError::VaultNotEmpty
+        );
+        require!(
+            ctx.accounts.vault_token_account.amount == 0,
+            VaultError::VaultNotEmpty
+        );
+
+        let authority = ctx.accounts.vault_state.authority;
+        let mint = ctx.accounts.vault_state.mint;
+        let bump = ctx.accounts.vault_state.bump;
+        let signer_seeds: &[&[&[u8]]] = &[&[b"state", authority.as_ref(), mint.as_ref(), &[bump]]];
+
+        let close_accounts = CloseAccount {
+            account: ctx.accounts.vault_token_account.to_account_info(),
+            destination: ctx.accounts.authority.to_account_info(),
+            authority: ctx.accounts.vault_state.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            close_accounts,
+            signer_seeds,
+        );
+
+        close_account(cpi_ctx)?;
 
         Ok(())
     }
@@ -183,6 +215,35 @@ pub struct Withdraw<'info> {
     pub token_program: Interface<'info, TokenInterface>,
 }
 
+#[derive(Accounts)]
+pub struct CloseVault<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        close = authority,
+        has_one = authority,
+        has_one = mint,
+        seeds = [b"state", authority.key().as_ref(), mint.key().as_ref()],
+        bump = vault_state.bump
+    )]
+    pub vault_state: Account<'info, VaultState>,
+
+    #[account(
+        mut,
+        token::mint = mint,
+        token::authority = vault_state,
+        seeds = [b"vault", authority.key().as_ref(), mint.key().as_ref()],
+        bump = vault_state.vault_bump
+    )]
+    pub vault_token_account: InterfaceAccount<'info, TokenAccount>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct VaultState {
@@ -201,4 +262,6 @@ pub enum VaultError {
     InsufficientFunds,
     #[msg("Token amount arithmetic overflowed")]
     MathOverflow,
+    #[msg("Vault must be empty before closing")]
+    VaultNotEmpty,
 }
